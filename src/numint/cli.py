@@ -75,7 +75,13 @@ app = typer.Typer(
     cls=DefaultCommandGroup,
     add_completion=True,
     no_args_is_help=False,
-    help="Numint: look up a phone number and get a clean intelligence profile.",
+    help=(
+        "Numint: phone number OSINT and intelligence.\n\n"
+        "Run [bold]numint <number>[/] to scan a number directly "
+        "(e.g. numint +14155550123), or use one of the commands below. "
+        "Add --recon to open lookup sites, --presence to find accounts, "
+        "or --web to launch the browser UI."
+    ),
     rich_markup_mode="rich",
 )
 config_app = typer.Typer(help="Manage persisted API keys.")
@@ -280,6 +286,8 @@ def scan(
       numint +14155550123
 
       numint +14155550123 --presence --yes-authorized
+
+      numint +14155550123 --recon
 
       numint --discord +14155550123
 

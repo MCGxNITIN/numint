@@ -139,10 +139,11 @@ numint web --port 8080      # then open http://localhost:8080
 ```
 
 The web app leads with the important stuff: the number, whether it is valid, its risk
-score, and the accounts found on it. Everything else (raw formats, carrier detail,
-search links, provider status) is tucked under **Advanced details** so the page stays
-clean. Tick **find accounts** to run the account check, or **send to Discord** to push the
-result to your channel.
+score, and the accounts found on it. It also shows a **Recon Tool** card with a button to
+open every lookup site in new tabs (see below). Everything else (raw formats, carrier
+detail, search links, provider status) is tucked under **Advanced details** so the page
+stays clean. Tick **find accounts** to run the account check, or **send to Discord** to
+push the result to your channel.
 
 ## Finding accounts on a number
 
@@ -318,6 +319,7 @@ numint/
     engine.py      parse, ask providers at once, merge, find accounts, AI
     aggregator.py  merges answers and tracks conflicts and confidence
     footprint.py   builds the search links
+    recon.py       builds the IntelTechniques-style lookup-site links
     report.py      terminal view, Markdown/JSON/PDF export, batch heatmap
   providers/       one file per data source
   presence/        one file per account check (based on ignorant)
