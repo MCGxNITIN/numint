@@ -126,6 +126,10 @@
   details.advanced .cards { margin-top: 0; border: none; border-radius: 0;
     border-top: 1px solid var(--border); }
 
+  /* recon */
+  .recon-note { color: var(--faint); font-size: 12px; margin: 0 0 12px; }
+  .recon-links { margin-top: 14px; }
+
   /* footprint */
   .fp-group { margin-bottom: 16px; } .fp-group:last-child { margin-bottom: 0; }
   .fp-group .cat { color: var(--muted); font-size: 11px; text-transform: uppercase;
@@ -279,6 +283,7 @@ function render(p){
   const risk = riskCard(p, true); if(risk) wow.push(risk);
   const ai = aiCard(p); if(ai) wow.push(ai);
   const conf = confidenceCard(p); if(conf) wow.push(conf);
+  const recon = reconCard(p); if(recon) wow.push(recon);
   el("results").innerHTML = wow.join("");
 
   // Everything else lives behind "Advanced details" so the headline stays clean.
@@ -393,6 +398,26 @@ function footprintCard(p){
   const groups = p.footprint.map(g=>`<div class="fp-group"><div class="cat">${esc(g.category)}</div>
     ${g.links.map(l=>`<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`).join("")}</div>`).join("");
   return `<div class="card"><h3>Search Links (open manually)</h3>${groups}</div>`;
+}
+
+function reconCard(p){
+  if(!p.recon || !p.recon.length) return null;
+  const count = p.recon.reduce((a,g)=>a+g.links.length,0);
+  const groups = p.recon.map(g=>`<div class="fp-group"><div class="cat">${esc(g.category)}</div>
+    ${g.links.map(l=>`<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`).join("")}</div>`).join("");
+  return `<div class="card"><h3>Recon Tool</h3>
+    <p class="recon-note">Opens reverse-lookup and search sites for this number in new tabs
+      (IntelTechniques-style). Your browser may ask to allow pop-ups.</p>
+    <div class="actions"><button class="primary" onclick="openRecon()">Open all ${count} sites in new tabs</button></div>
+    <div class="recon-links">${groups}</div></div>`;
+}
+
+function openRecon(){
+  if(!lastProfile || !lastProfile.recon) return;
+  const urls = lastProfile.recon.flatMap(g=>g.links.map(l=>l.url));
+  let opened = 0;
+  for(const u of urls){ if(window.open(u, "_blank", "noopener")) opened++; }
+  toast(opened ? `Opening ${opened} sites` : "Pop-ups blocked. Allow pop-ups for this page, then retry.");
 }
 
 function providerCard(p){

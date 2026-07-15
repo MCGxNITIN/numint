@@ -79,6 +79,9 @@ numint +14155550123
 # Find where it is registered online
 numint +14155550123 --presence --yes-authorized
 
+# Open a set of reverse-lookup and search sites in your browser
+numint +14155550123 --recon
+
 # Ask a plain question, answered only from what was found
 numint +14155550123 --ask "is this a real mobile or a VoIP number?"
 
@@ -163,6 +166,26 @@ pages often, so a check may sometimes say `unknown` or `rate_limited`. That is n
 
 Adding a new site is one file. Copy `src/numint/presence/_template.py`, rename it, and
 fill in the check. It is picked up automatically.
+
+## Recon tool (open lookup sites)
+
+Inspired by the IntelTechniques phone tool. `--recon` builds a curated set of
+reverse-lookup and search-engine links for the number and opens them all in your
+browser at once, for manual review. It only opens URLs; it never scrapes or logs
+in anywhere. It is opt-in and never runs on its own.
+
+```bash
+numint +14155550123 --recon
+```
+
+US and Canada numbers get the full people-search set (ThatsThem, TruePeopleSearch,
+FastPeopleSearch, Whitepages, ZabaSearch, and more); other countries get the
+search-engine links. In the web app, run a scan and click **Open all sites in new
+tabs** on the Recon Tool card (your browser may ask to allow pop-ups). On a headless
+machine with no browser, the links are printed so you can open them yourself.
+
+Edit the site list any time in `src/numint/data/recon_sites.yaml`; each entry is
+one line, so adding or removing a site needs no code changes.
 
 ## Sending results to Discord
 

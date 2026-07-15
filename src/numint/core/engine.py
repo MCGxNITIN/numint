@@ -24,6 +24,7 @@ from .models import (
 )
 from .parser import parse_number
 from .ratelimit import RateLimiter
+from .recon import build_recon
 from .registry import discover
 
 log = get_logger("engine")
@@ -65,13 +66,16 @@ class Engine:
         use_cache: bool = True,
         with_footprint: bool = True,
         with_presence: bool = False,
+        with_recon: bool = False,
         with_ai: bool = True,
         ask: str | None = None,
     ) -> Profile:
         """Run the full pipeline for a single number.
 
         `with_presence` is opt-in (authorized use only): it actively probes
-        third-party sites to see where the number is registered.
+        third-party sites to see where the number is registered. `with_recon`
+        builds the IntelTechniques-style list of reverse-lookup / search links
+        to open manually (URLs only, no network).
         """
         number = parse_number(raw_number, default_region)
 
@@ -85,6 +89,9 @@ class Engine:
 
         if with_footprint:
             profile.footprint = build_footprint(number)
+
+        if with_recon:
+            profile.recon = build_recon(number)
 
         if with_ai:
             # Imported lazily so the AI stack is optional at import time.

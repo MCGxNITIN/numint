@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import webbrowser
 from pathlib import Path
 
 import typer
@@ -104,6 +105,7 @@ def _run_and_render(
     country: str | None,
     output: str | None,
     ask: str | None,
+    recon: bool = False,
     discord: bool = False,
     discord_url: str | None = None,
 ) -> None:
@@ -116,6 +118,7 @@ def _run_and_render(
                 use_cache=not no_cache,
                 with_footprint=not no_footprint,
                 with_presence=presence,
+                with_recon=recon,
                 with_ai=not no_ai,
                 ask=ask,
             )
@@ -137,10 +140,45 @@ def _run_and_render(
     elif not output:
         render_console(profile, console)
 
+    if recon:
+        _open_recon(profile, as_json=as_json)
+
     _maybe_discord(profile, discord, discord_url)
 
     if not profile.input.is_possible:
         raise typer.Exit(code=1)
+
+
+def _open_recon(profile, *, as_json: bool) -> None:
+    """Open the recon sites in the browser and list them.
+
+    Opening may fail on a headless box (no display); we always print the links
+    so they stay usable there.
+    """
+    links = [link for group in profile.recon for link in group.links]
+    if not links:
+        return
+    if not as_json:
+        console.print(f"\n[bold {ACCENT}]Recon[/] - opening {len(links)} sites:")
+        for group in profile.recon:
+            console.print(f"[{MUTED}]{group.category}[/]")
+            for link in group.links:
+                console.print(f"  {link.label}: {link.url}")
+    opened = 0
+    for link in links:
+        try:
+            if webbrowser.open(link.url, new=2):
+                opened += 1
+        except Exception:  # noqa: BLE001 - headless / no browser is fine
+            pass
+    if not as_json:
+        if opened:
+            console.print(f"[{MUTED}]Opened {opened} browser tab(s).[/]")
+        else:
+            console.print(
+                f"[{MUTED}]No browser available - open the links above "
+                "manually.[/]"
+            )
 
 
 def _maybe_discord(profile, discord: bool, discord_url: str | None) -> None:
@@ -209,6 +247,11 @@ def scan(
         help="Confirm you are allowed to check this number (needed for "
         "--presence).",
     ),
+    recon: bool = typer.Option(
+        False, "--recon",
+        help="Open reverse-lookup and search sites for the number in your "
+        "browser (IntelTechniques-style). Opt-in.",
+    ),
     heatmap: bool = typer.Option(
         False, "--heatmap",
         help="Batch only: show just the colored risk grid.",
@@ -272,6 +315,7 @@ def scan(
         country=country,
         output=output,
         ask=ask,
+        recon=recon,
         discord=discord,
         discord_url=discord_url,
     )

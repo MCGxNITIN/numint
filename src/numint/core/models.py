@@ -161,6 +161,7 @@ class Profile(BaseModel):
     risk: RiskProfile = Field(default_factory=RiskProfile)
     presence: list[PresenceResult] = Field(default_factory=list)
     footprint: list[FootprintGroup] = Field(default_factory=list)
+    recon: list[FootprintGroup] = Field(default_factory=list)
     providers: list[ProviderReport] = Field(default_factory=list)
     ai_analysis: AIAnalysis | None = None
 

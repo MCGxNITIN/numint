@@ -70,6 +70,7 @@ def create_app() -> FastAPI:
                 use_cache=not req.no_cache,
                 with_footprint=not req.no_footprint,
                 with_presence=req.presence,
+                with_recon=True,  # URLs only; the UI offers an "open all" button
                 with_ai=not req.no_ai,
                 ask=req.ask,
             )
