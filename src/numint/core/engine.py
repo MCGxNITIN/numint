@@ -13,8 +13,9 @@ import httpx
 from .aggregator import aggregate
 from .cache import Cache
 from .config import Settings, get_settings
-from .footprint import build_footprint
+from .footprint import build_dorking, build_footprint
 from .logging import get_logger
+from .lookup import build_sites
 from .models import (
     ParsedNumber,
     Profile,
@@ -24,7 +25,6 @@ from .models import (
 )
 from .parser import parse_number
 from .ratelimit import RateLimiter
-from .recon import build_recon
 from .registry import discover
 
 log = get_logger("engine")
@@ -64,22 +64,30 @@ class Engine:
         *,
         default_region: str | None = None,
         use_cache: bool = True,
+        with_offline: bool = True,
+        with_api: bool = True,
         with_footprint: bool = True,
+        with_dorking: bool = False,
         with_presence: bool = False,
-        with_recon: bool = False,
+        with_sites: bool = False,
+        sites_top_only: bool = True,
         with_ai: bool = True,
         ask: str | None = None,
     ) -> Profile:
-        """Run the full pipeline for a single number.
+        """Run the pipeline for a single number.
 
-        `with_presence` is opt-in (authorized use only): it actively probes
-        third-party sites to see where the number is registered. `with_recon`
-        builds the IntelTechniques-style list of reverse-lookup / search links
-        to open manually (URLs only, no network).
+        The layers are opt-in-able: `with_offline` runs the built-in
+        libphonenumber provider, `with_api` runs the key'd data providers,
+        `with_dorking` builds search-engine dork links, `with_sites` builds the
+        reverse-lookup site links (for the `--open` tool). `with_presence` is
+        authorized-use-only and actively probes third-party sites. Everything
+        that only builds URLs makes no network calls.
         """
         number = parse_number(raw_number, default_region)
 
-        results, reports = await self._run_providers(number, use_cache)
+        results, reports = await self._run_providers(
+            number, use_cache, with_offline, with_api
+        )
 
         profile = aggregate(number, results)
         profile.providers = reports
@@ -90,8 +98,11 @@ class Engine:
         if with_footprint:
             profile.footprint = build_footprint(number)
 
-        if with_recon:
-            profile.recon = build_recon(number)
+        if with_dorking:
+            profile.dorking = build_dorking(number)
+
+        if with_sites:
+            profile.sites = build_sites(number, top_only=sites_top_only)
 
         if with_ai:
             # Imported lazily so the AI stack is optional at import time.
@@ -109,7 +120,11 @@ class Engine:
         return profile
 
     async def _run_providers(
-        self, number: ParsedNumber, use_cache: bool
+        self,
+        number: ParsedNumber,
+        use_cache: bool,
+        with_offline: bool = True,
+        with_api: bool = True,
     ) -> tuple[list[ProviderResult], list[ProviderReport]]:
         instances = [cls(self.settings) for cls in self._provider_classes]
         reports: list[ProviderReport] = []
@@ -117,6 +132,12 @@ class Engine:
         results: list[ProviderResult] = []
 
         for inst in instances:
+            # A provider is "offline" (the built-in one) when it needs no key.
+            is_offline = not inst.requires_key
+            if is_offline and not with_offline:
+                continue
+            if not is_offline and not with_api:
+                continue
             if not inst.is_configured():
                 reports.append(
                     ProviderReport(

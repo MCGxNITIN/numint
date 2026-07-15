@@ -228,6 +228,21 @@ def _footprint_card(profile: Profile) -> Panel | None:
     return Panel(body, title="OSINT Footprint (open manually)", border_style=MUTED)
 
 
+def _dorking_card(profile: Profile) -> Panel | None:
+    if not profile.dorking:
+        return None
+    body = Table.grid(padding=(0, 1))
+    body.add_column()
+    for group in profile.dorking:
+        for link in group.links:
+            line = Text("  • ")
+            line.append(link.label, style=MUTED)
+            line.append("  ")
+            line.append(link.url, style="underline")
+            body.add_row(line)
+    return Panel(body, title="Dorking (search-engine links)", border_style=MUTED)
+
+
 def _providers_card(profile: Profile) -> Panel:
     t = Table(show_edge=False, expand=True)
     t.add_column("Provider")
@@ -257,6 +272,7 @@ def render_console(profile: Profile, console: Console | None = None) -> None:
         _risk_card(profile),
         _presence_card(profile),
         _ai_card(profile),
+        _dorking_card(profile),
         _footprint_card(profile),
     ):
         if maybe is not None:

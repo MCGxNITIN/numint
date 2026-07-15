@@ -79,7 +79,7 @@ app = typer.Typer(
         "Numint: phone number OSINT and intelligence.\n\n"
         "Run [bold]numint <number>[/] to scan a number directly "
         "(e.g. numint +14155550123), or use one of the commands below. "
-        "Add --recon to open lookup sites, --presence to find accounts, "
+        "Add --open to open lookup sites, --presence to find accounts, "
         "or --web to launch the browser UI."
     ),
     rich_markup_mode="rich",
@@ -103,15 +103,17 @@ def _version_callback(value: bool) -> None:
 def _run_and_render(
     number: str,
     *,
+    with_offline: bool,
+    with_api: bool,
+    with_ai: bool,
+    with_footprint: bool,
+    with_dorking: bool,
+    presence: bool,
     as_json: bool,
     no_cache: bool,
-    no_footprint: bool,
-    no_ai: bool,
-    presence: bool,
     country: str | None,
     output: str | None,
     ask: str | None,
-    recon: bool = False,
     discord: bool = False,
     discord_url: str | None = None,
 ) -> None:
@@ -122,10 +124,12 @@ def _run_and_render(
                 number,
                 default_region=country.upper() if country else None,
                 use_cache=not no_cache,
-                with_footprint=not no_footprint,
+                with_offline=with_offline,
+                with_api=with_api,
+                with_ai=with_ai,
+                with_footprint=with_footprint,
+                with_dorking=with_dorking,
                 with_presence=presence,
-                with_recon=recon,
-                with_ai=not no_ai,
                 ask=ask,
             )
         )
@@ -146,30 +150,44 @@ def _run_and_render(
     elif not output:
         render_console(profile, console)
 
-    if recon:
-        _open_recon(profile, as_json=as_json)
-
     _maybe_discord(profile, discord, discord_url)
 
     if not profile.input.is_possible:
         raise typer.Exit(code=1)
 
 
-def _open_recon(profile, *, as_json: bool) -> None:
-    """Open the recon sites in the browser and list them.
+def _open_sites(number: str, *, all_sites: bool, country: str | None) -> None:
+    """Open lookup sites + dorking links in the browser. Does not scan.
 
     Opening may fail on a headless box (no display); we always print the links
     so they stay usable there.
     """
-    links = [link for group in profile.recon for link in group.links]
+    from .core.footprint import build_dorking
+    from .core.lookup import build_sites
+    from .core.parser import parse_number
+
+    try:
+        parsed = parse_number(number, country.upper() if country else None)
+    except ParseError as exc:
+        err_console.print(f"[bold red]Error:[/] {exc}")
+        raise typer.Exit(code=2) from None
+
+    groups = build_sites(parsed, top_only=not all_sites) + build_dorking(parsed)
+    links = [link for group in groups for link in group.links]
     if not links:
+        console.print(f"[{MUTED}]No lookup sites available for this number.[/]")
         return
-    if not as_json:
-        console.print(f"\n[bold {ACCENT}]Recon[/] - opening {len(links)} sites:")
-        for group in profile.recon:
-            console.print(f"[{MUTED}]{group.category}[/]")
-            for link in group.links:
-                console.print(f"  {link.label}: {link.url}")
+
+    scope = "all" if all_sites else "top"
+    console.print(
+        f"[bold {ACCENT}]Opening[/] {len(links)} {scope} sites for "
+        f"{parsed.e164}:"
+    )
+    for group in groups:
+        console.print(f"[{MUTED}]{group.category}[/]")
+        for link in group.links:
+            console.print(f"  {link.label}: {link.url}")
+
     opened = 0
     for link in links:
         try:
@@ -177,13 +195,12 @@ def _open_recon(profile, *, as_json: bool) -> None:
                 opened += 1
         except Exception:  # noqa: BLE001 - headless / no browser is fine
             pass
-    if not as_json:
-        if opened:
-            console.print(f"[{MUTED}]Opened {opened} browser tab(s).[/]")
-        else:
-            console.print(
-                f"[{MUTED}]No browser available - open the links above "
-                "manually.[/]"
+    if opened:
+        console.print(f"[{MUTED}]Opened {opened} browser tab(s).[/]")
+    else:
+        console.print(
+            f"[{MUTED}]No browser available - open the links above "
+            "manually.[/]"
             )
 
 
@@ -253,10 +270,27 @@ def scan(
         help="Confirm you are allowed to check this number (needed for "
         "--presence).",
     ),
-    recon: bool = typer.Option(
-        False, "--recon",
-        help="Open reverse-lookup and search sites for the number in your "
-        "browser (IntelTechniques-style). Opt-in.",
+    open_sites: bool = typer.Option(
+        False, "--open",
+        help="Do not scan; open lookup sites for the number in your browser. "
+        "Opens the top few; add --all for every site.",
+    ),
+    all_layers: bool = typer.Option(
+        False, "--all",
+        help="Run every scan layer (offline + api + ai + links). With --open, "
+        "open every site instead of just the top few.",
+    ),
+    offline: bool = typer.Option(
+        False, "--offline", help="Run only the offline (libphonenumber) layer."
+    ),
+    api: bool = typer.Option(
+        False, "--api", help="Run only the API data providers. Combine freely."
+    ),
+    ai: bool = typer.Option(
+        False, "--ai", help="Run only the AI summary. Combine freely."
+    ),
+    dorking: bool = typer.Option(
+        False, "--dorking", help="Show only the search-engine dorking links."
     ),
     heatmap: bool = typer.Option(
         False, "--heatmap",
@@ -281,21 +315,39 @@ def scan(
 ) -> None:
     """Look up a phone number (or a whole file with --input).
 
-    Flags can go before or after the number. Examples:
+    By default (or with --all) it runs every layer. Pick specific layers with
+    --offline, --api, --ai, --dorking (combine them). --open does not scan; it
+    just opens lookup sites in your browser. Flags can go before or after the
+    number. Examples:
 
-      numint +14155550123
+      numint +14155550123                     full scan
+
+      numint +14155550123 --all               same, explicit
+
+      numint +14155550123 --api --ai          only API data + AI summary
+
+      numint +14155550123 --offline           only offline basics
+
+      numint +14155550123 --dorking           only search-engine dork links
+
+      numint +14155550123 --open              open the top lookup sites
+
+      numint +14155550123 --open --all        open every lookup site
 
       numint +14155550123 --presence --yes-authorized
-
-      numint +14155550123 --recon
-
-      numint --discord +14155550123
-
-      numint +14155550123 --ask "is this a real mobile or VoIP?"
 
       numint scan --input numbers.txt --heatmap
     """
     setup_logging()
+
+    # --open is an action, not a scan: just open the lookup sites and stop.
+    if open_sites:
+        if not number:
+            err_console.print("[bold red]Error:[/] --open needs a number.")
+            raise typer.Exit(code=2)
+        _open_sites(number, all_sites=all_layers, country=country)
+        return
+
     if presence and not yes_authorized:
         err_console.print(
             "[bold red]Refused:[/] --presence actively probes third-party "
@@ -303,6 +355,7 @@ def scan(
             "authorized to investigate this number."
         )
         raise typer.Exit(code=2)
+
     if input:
         _batch(
             input, as_json, no_cache, no_footprint, no_ai, country,
@@ -313,17 +366,37 @@ def scan(
     if not number:
         err_console.print("[bold red]Error:[/] provide a number or --input file.")
         raise typer.Exit(code=2)
+
+    # Resolve which layers to run. No selector (or --all) means a full scan;
+    # otherwise run only the layers the user asked for.
+    selective = any([offline, api, ai, dorking])
+    if all_layers or not selective:
+        w_offline, w_api, w_ai, w_footprint, w_dorking = (
+            True, True, True, True, False,
+        )
+    else:
+        w_offline, w_api, w_ai, w_footprint, w_dorking = (
+            offline, api, ai, False, dorking,
+        )
+    # --no-* still switch layers off within a full scan.
+    if no_ai:
+        w_ai = False
+    if no_footprint:
+        w_footprint = False
+
     _run_and_render(
         number,
+        with_offline=w_offline,
+        with_api=w_api,
+        with_ai=w_ai,
+        with_footprint=w_footprint,
+        with_dorking=w_dorking,
+        presence=presence,
         as_json=as_json,
         no_cache=no_cache,
-        no_footprint=no_footprint,
-        no_ai=no_ai,
-        presence=presence,
         country=country,
         output=output,
         ask=ask,
-        recon=recon,
         discord=discord,
         discord_url=discord_url,
     )
