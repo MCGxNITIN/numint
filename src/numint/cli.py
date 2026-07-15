@@ -79,7 +79,7 @@ app = typer.Typer(
         "Numint: phone number OSINT and intelligence.\n\n"
         "Run [bold]numint <number>[/] to scan a number directly "
         "(e.g. numint +14155550123), or use one of the commands below. "
-        "Add --open to open lookup sites, --presence to find accounts, "
+        "Add --lookup or --dorking to open sites, --presence to find accounts, "
         "or --web to launch the browser UI."
     ),
     rich_markup_mode="rich",
@@ -156,13 +156,22 @@ def _run_and_render(
         raise typer.Exit(code=1)
 
 
-def _open_sites(number: str, *, all_sites: bool, country: str | None) -> None:
-    """Open lookup sites + dorking links in the browser. Does not scan.
+def _open_action(
+    number: str,
+    *,
+    country: str | None,
+    lookup: bool,
+    lookup_all: bool,
+    dorking: bool,
+    dorking_all: bool,
+) -> None:
+    """Open lookup sites and/or dork searches in the browser. Does not scan.
 
-    Opening may fail on a headless box (no display); we always print the links
-    so they stay usable there.
+    Lookup sites and dork searches are separate: only what was asked for is
+    opened. Opening may fail on a headless box (no display), so we always print
+    the links too.
     """
-    from .core.footprint import build_dorking
+    from .core.dorking import build_dorking
     from .core.lookup import build_sites
     from .core.parser import parse_number
 
@@ -172,16 +181,23 @@ def _open_sites(number: str, *, all_sites: bool, country: str | None) -> None:
         err_console.print(f"[bold red]Error:[/] {exc}")
         raise typer.Exit(code=2) from None
 
-    groups = build_sites(parsed, top_only=not all_sites) + build_dorking(parsed)
+    groups = []
+    if lookup:
+        groups += build_sites(parsed, top_only=True)
+    if lookup_all:
+        groups += build_sites(parsed, top_only=False)
+    if dorking:
+        groups += build_dorking(parsed, top_only=True)
+    if dorking_all:
+        groups += build_dorking(parsed, top_only=False)
+
     links = [link for group in groups for link in group.links]
     if not links:
-        console.print(f"[{MUTED}]No lookup sites available for this number.[/]")
+        console.print(f"[{MUTED}]Nothing to open for this number.[/]")
         return
 
-    scope = "all" if all_sites else "top"
     console.print(
-        f"[bold {ACCENT}]Opening[/] {len(links)} {scope} sites for "
-        f"{parsed.e164}:"
+        f"[bold {ACCENT}]Opening[/] {len(links)} link(s) for {parsed.e164}:"
     )
     for group in groups:
         console.print(f"[{MUTED}]{group.category}[/]")
@@ -254,9 +270,6 @@ def scan(
     no_cache: bool = typer.Option(
         False, "--no-cache", help="Skip the cache and fetch fresh results."
     ),
-    no_footprint: bool = typer.Option(
-        False, "--no-footprint", help="Do not build the search-links section."
-    ),
     no_ai: bool = typer.Option(
         False, "--no-ai", help="Skip the AI summary even if a key is set."
     ),
@@ -270,15 +283,10 @@ def scan(
         help="Confirm you are allowed to check this number (needed for "
         "--presence).",
     ),
-    open_sites: bool = typer.Option(
-        False, "--open",
-        help="Do not scan; open lookup sites for the number in your browser. "
-        "Opens the top few; add --all for every site.",
-    ),
     all_layers: bool = typer.Option(
         False, "--all",
-        help="Run every scan layer (offline + api + ai + links). With --open, "
-        "open every site instead of just the top few.",
+        help="Full scan (offline + api + ai) and list the dorking links. "
+        "Opens nothing.",
     ),
     offline: bool = typer.Option(
         False, "--offline", help="Run only the offline (libphonenumber) layer."
@@ -289,8 +297,21 @@ def scan(
     ai: bool = typer.Option(
         False, "--ai", help="Run only the AI summary. Combine freely."
     ),
+    lookup: bool = typer.Option(
+        False, "--lookup",
+        help="Do not scan; open the top 5 reverse-lookup sites in the browser.",
+    ),
+    lookup_all: bool = typer.Option(
+        False, "--lookup-all",
+        help="Do not scan; open every reverse-lookup site in the browser.",
+    ),
     dorking: bool = typer.Option(
-        False, "--dorking", help="Show only the search-engine dorking links."
+        False, "--dorking",
+        help="Do not scan; open the top 5 search-engine dorks in the browser.",
+    ),
+    dorking_all: bool = typer.Option(
+        False, "--dorking-all",
+        help="Do not scan; open every search-engine dork in the browser.",
     ),
     heatmap: bool = typer.Option(
         False, "--heatmap",
@@ -315,24 +336,24 @@ def scan(
 ) -> None:
     """Look up a phone number (or a whole file with --input).
 
-    By default (or with --all) it runs every layer. Pick specific layers with
-    --offline, --api, --ai, --dorking (combine them). --open does not scan; it
-    just opens lookup sites in your browser. Flags can go before or after the
-    number. Examples:
+    A full scan (default, or --all) runs offline + api + ai and lists the
+    dorking links. Pick single layers with --offline, --api, --ai (combine
+    them). The --lookup / --dorking flags do NOT scan; they open sites in your
+    browser. Flags can go before or after the number. Examples:
 
-      numint +14155550123                     full scan
-
-      numint +14155550123 --all               same, explicit
+      numint +14155550123                     full scan, lists dorking links
 
       numint +14155550123 --api --ai          only API data + AI summary
 
       numint +14155550123 --offline           only offline basics
 
-      numint +14155550123 --dorking           only search-engine dork links
+      numint +14155550123 --lookup            open the top 5 lookup sites
 
-      numint +14155550123 --open              open the top lookup sites
+      numint +14155550123 --lookup-all        open every lookup site
 
-      numint +14155550123 --open --all        open every lookup site
+      numint +14155550123 --dorking           open the top 5 dork searches
+
+      numint +14155550123 --dorking-all       open every dork search
 
       numint +14155550123 --presence --yes-authorized
 
@@ -340,12 +361,18 @@ def scan(
     """
     setup_logging()
 
-    # --open is an action, not a scan: just open the lookup sites and stop.
-    if open_sites:
+    # --lookup / --dorking are actions, not scans: open sites and stop.
+    if lookup or lookup_all or dorking or dorking_all:
         if not number:
-            err_console.print("[bold red]Error:[/] --open needs a number.")
+            err_console.print(
+                "[bold red]Error:[/] --lookup / --dorking need a number."
+            )
             raise typer.Exit(code=2)
-        _open_sites(number, all_sites=all_layers, country=country)
+        _open_action(
+            number, country=country,
+            lookup=lookup, lookup_all=lookup_all,
+            dorking=dorking, dorking_all=dorking_all,
+        )
         return
 
     if presence and not yes_authorized:
@@ -358,7 +385,7 @@ def scan(
 
     if input:
         _batch(
-            input, as_json, no_cache, no_footprint, no_ai, country,
+            input, as_json, no_cache, no_ai, country,
             presence=presence, heatmap=heatmap,
             discord=discord, discord_url=discord_url,
         )
@@ -367,29 +394,22 @@ def scan(
         err_console.print("[bold red]Error:[/] provide a number or --input file.")
         raise typer.Exit(code=2)
 
-    # Resolve which layers to run. No selector (or --all) means a full scan;
+    # No selector (or --all) means a full scan that also lists the dork links;
     # otherwise run only the layers the user asked for.
-    selective = any([offline, api, ai, dorking])
+    selective = any([offline, api, ai])
     if all_layers or not selective:
-        w_offline, w_api, w_ai, w_footprint, w_dorking = (
-            True, True, True, True, False,
-        )
+        w_offline, w_api, w_ai, w_dorking = True, True, True, True
     else:
-        w_offline, w_api, w_ai, w_footprint, w_dorking = (
-            offline, api, ai, False, dorking,
-        )
-    # --no-* still switch layers off within a full scan.
+        w_offline, w_api, w_ai, w_dorking = offline, api, ai, False
     if no_ai:
         w_ai = False
-    if no_footprint:
-        w_footprint = False
 
     _run_and_render(
         number,
         with_offline=w_offline,
         with_api=w_api,
         with_ai=w_ai,
-        with_footprint=w_footprint,
+        with_footprint=False,
         with_dorking=w_dorking,
         presence=presence,
         as_json=as_json,
@@ -406,7 +426,6 @@ def _batch(
     input: Path,
     as_json: bool,
     no_cache: bool,
-    no_footprint: bool,
     no_ai: bool,
     country: str | None,
     *,
@@ -439,7 +458,7 @@ def _batch(
                         num,
                         default_region=country.upper() if country else None,
                         use_cache=not no_cache,
-                        with_footprint=not no_footprint,
+                        with_footprint=False,
                         with_presence=presence,
                         with_ai=not no_ai,
                     )

@@ -1,4 +1,4 @@
-"""Lookup-site links for the `--open` tool.
+"""Lookup-site links for the `--lookup` tool.
 
 Given a number, fills a curated list of reverse-lookup / people-search URL
 templates (see `data/lookup_sites.yaml`) so an investigator can open them for

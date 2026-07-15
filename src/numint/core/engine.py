@@ -13,7 +13,8 @@ import httpx
 from .aggregator import aggregate
 from .cache import Cache
 from .config import Settings, get_settings
-from .footprint import build_dorking, build_footprint
+from .dorking import build_dorking
+from .footprint import build_footprint
 from .logging import get_logger
 from .lookup import build_sites
 from .models import (
@@ -79,7 +80,7 @@ class Engine:
         The layers are opt-in-able: `with_offline` runs the built-in
         libphonenumber provider, `with_api` runs the key'd data providers,
         `with_dorking` builds search-engine dork links, `with_sites` builds the
-        reverse-lookup site links (for the `--open` tool). `with_presence` is
+        reverse-lookup site links (for the `--lookup` tool). `with_presence` is
         authorized-use-only and actively probes third-party sites. Everything
         that only builds URLs makes no network calls.
         """

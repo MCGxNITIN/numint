@@ -400,27 +400,29 @@ function footprintCard(p){
   return `<div class="card"><h3>Search Links (open manually)</h3>${groups}</div>`;
 }
 
-function sitesCard(p){
-  const siteGroups = p.sites || [];
-  if(!siteGroups.length) return null;
-  const dorkCount = (p.dorking||[]).reduce((a,g)=>a+g.links.length,0);
-  const count = siteGroups.reduce((a,g)=>a+g.links.length,0) + dorkCount;
-  const groups = siteGroups.map(g=>`<div class="fp-group"><div class="cat">${esc(g.category)}</div>
+function linkGroups(groups){
+  return (groups||[]).map(g=>`<div class="fp-group"><div class="cat">${esc(g.category)}</div>
     ${g.links.map(l=>`<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`).join("")}</div>`).join("");
-  return `<div class="card"><h3>Open Lookup Sites</h3>
-    <p class="site-note">Opens reverse-lookup / people-search sites and search-engine
-      dork links for this number in new tabs. Your browser may ask to allow pop-ups.</p>
-    <div class="actions"><button class="primary" onclick="openSites()">Open all ${count} sites in new tabs</button></div>
-    <div class="site-links">${groups}</div></div>`;
+}
+function countLinks(groups){ return (groups||[]).reduce((a,g)=>a+g.links.length,0); }
+
+function sitesCard(p){
+  const nSites = countLinks(p.sites), nDorks = countLinks(p.dorking);
+  if(!nSites && !nDorks) return null;
+  let body = `<p class="site-note">Open these in new tabs for manual review. Lookup sites and
+    dork searches are separate. Your browser may ask to allow pop-ups.</p><div class="actions">`;
+  if(nSites) body += `<button class="primary" onclick="openLinks('sites')">Open ${nSites} lookup sites</button>`;
+  if(nDorks) body += `<button class="primary" onclick="openLinks('dorking')">Open ${nDorks} dork searches</button>`;
+  body += `</div><div class="site-links">${linkGroups(p.sites)}${linkGroups(p.dorking)}</div>`;
+  return `<div class="card"><h3>Open Sites</h3>${body}</div>`;
 }
 
-function openSites(){
+function openLinks(which){
   if(!lastProfile) return;
-  const urls = [...(lastProfile.sites||[]), ...(lastProfile.dorking||[])]
-    .flatMap(g=>g.links.map(l=>l.url));
+  const urls = (lastProfile[which]||[]).flatMap(g=>g.links.map(l=>l.url));
   let opened = 0;
   for(const u of urls){ if(window.open(u, "_blank", "noopener")) opened++; }
-  toast(opened ? `Opening ${opened} sites` : "Pop-ups blocked. Allow pop-ups for this page, then retry.");
+  toast(opened ? `Opening ${opened} links` : "Pop-ups blocked. Allow pop-ups for this page, then retry.");
 }
 
 function providerCard(p){

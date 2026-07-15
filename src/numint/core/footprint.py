@@ -71,26 +71,3 @@ def build_footprint(number: ParsedNumber) -> list[FootprintGroup]:
                 )
             )
     return groups
-
-
-def build_dorking(number: ParsedNumber) -> list[FootprintGroup]:
-    """Return just the search-engine dork links (Google/Bing/DuckDuckGo).
-
-    A focused subset of the footprint, used by `--dorking` and opened by the
-    `--open` tool.
-    """
-    templates = _load_templates()
-    subs = _substitutions(number)
-    links: list[FootprintLink] = []
-    for entry in templates.get("search_engines", []) or []:
-        url = _fill(entry.get("template", ""), subs)
-        if url:
-            links.append(FootprintLink(label=entry["label"], url=url))
-    if not links:
-        return []
-    return [FootprintGroup(category="Search Engine Dorks", links=links)]
-
-
-def dorking_urls(number: ParsedNumber) -> list[str]:
-    """Flat list of dork URLs (used by the `--open` tool)."""
-    return [link.url for group in build_dorking(number) for link in group.links]

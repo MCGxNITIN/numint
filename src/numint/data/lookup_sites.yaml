@@ -1,9 +1,9 @@
-# Reverse-lookup / people-search sites for the `--open` tool.
+# Reverse-lookup / people-search sites for the `--lookup` tool.
 #
-# `numint <number> --open` opens the `top: true` sites (the few that show the
-# most, and actually work) plus the dorking links. `numint <number> --open --all`
-# opens every site below. It only opens URLs for manual review; it never scrapes
-# or logs in.
+# `numint <number> --lookup` opens the `top: true` sites (the few that show the
+# most, and actually work). `numint <number> --lookup-all` opens every site
+# below. It only opens URLs for manual review; it never scrapes or logs in.
+# Dork searches are separate (see dorking.yaml).
 #
 # Placeholders: {area} {prefix} {suffix} {digits10} {natdigits} {digits}
 #               {e164} {plus_enc} {iso}   (see core/lookup.py)

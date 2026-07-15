@@ -80,7 +80,7 @@ numint +14155550123
 numint +14155550123 --presence --yes-authorized
 
 # Open the top lookup sites in your browser (does not scan)
-numint +14155550123 --open
+numint +14155550123 --lookup
 
 # Ask a plain question, answered only from what was found
 numint +14155550123 --ask "is this a real mobile or a VoIP number?"
@@ -120,15 +120,15 @@ With no flags (or `--all`) every layer runs. To run just some layers, name them;
 combine.
 
 ```bash
-numint +14155550123 --all          # everything (the default)
+numint +14155550123 --all          # everything, and lists the dorking links
 numint +14155550123 --offline      # only the offline libphonenumber basics
 numint +14155550123 --api          # only the API data providers
 numint +14155550123 --ai           # only the AI summary
 numint +14155550123 --api --ai     # API data plus the AI summary
-numint +14155550123 --dorking      # only the search-engine dork links
 ```
 
-`--open` is separate: it does not scan, it just opens lookup sites (see below).
+A full scan (default or `--all`) also **lists** the search-engine dork links as text.
+Opening sites in the browser is separate; see below.
 
 ### Scan a whole list (with a risk heatmap)
 
@@ -152,8 +152,8 @@ numint web --port 8080      # then open http://localhost:8080
 ```
 
 The web app leads with the important stuff: the number, whether it is valid, its risk
-score, and the accounts found on it. It also shows an **Open Lookup Sites** card with a
-button to open every lookup site in new tabs (see below). Everything else (raw formats, carrier
+score, and the accounts found on it. It also shows an **Open Sites** card with separate
+buttons for the lookup sites and the dork searches (see below). Everything else (raw formats, carrier
 detail, search links, provider status) is tucked under **Advanced details** so the page
 stays clean. Tick **find accounts** to run the account check, or **send to Discord** to
 push the result to your channel.
@@ -181,26 +181,30 @@ pages often, so a check may sometimes say `unknown` or `rate_limited`. That is n
 Adding a new site is one file. Copy `src/numint/presence/_template.py`, rename it, and
 fill in the check. It is picked up automatically.
 
-## Open lookup sites
+## Opening sites in the browser
 
-Inspired by the IntelTechniques phone tool. `--open` does **not** run a scan; it fills a
-curated set of reverse-lookup / people-search URLs plus search-engine dork links and opens
-them in your browser for manual review. It only opens URLs; it never scrapes or logs in.
+Inspired by the IntelTechniques phone tool. These flags do **not** run a scan; they just
+fill URLs and open them in your browser for manual review (they never scrape or log in).
+Lookup sites and dork searches are kept separate, and the top set is small so you are not
+buried in tabs.
 
 ```bash
-numint +14155550123 --open          # opens the top few sites + dork links
-numint +14155550123 --open --all    # opens every site in the list
+numint +14155550123 --lookup        # open the top 5 reverse-lookup sites
+numint +14155550123 --lookup-all    # open every reverse-lookup site
+numint +14155550123 --dorking       # open the top 5 search-engine dork searches
+numint +14155550123 --dorking-all   # open every dork search
 ```
 
-By default it opens just the handful of highest-signal sites (ThatsThem, TruePeopleSearch,
-FastPeopleSearch, Whitepages, Sync.me) so you are not buried in tabs; add `--all` for the
-full list. US and Canada numbers get the people-search sites; other countries get the ones
-that work internationally. In the web app, run a scan and click **Open all sites in new
-tabs** on the Open Lookup Sites card (your browser may ask to allow pop-ups). On a headless
-machine with no browser, the links are printed so you can open them yourself.
+The top lookup sites are the handful that show the most and actually work (ThatsThem,
+TruePeopleSearch, FastPeopleSearch, Whitepages, Sync.me). US and Canada numbers get the
+people-search sites; other countries get the ones that work internationally. In the web
+app, run a scan and use the **Open Sites** card, which has one button for lookup sites and
+another for dork searches (your browser may ask to allow pop-ups). On a headless machine
+with no browser, the links are printed so you can open them yourself.
 
-Edit the site list any time in `src/numint/data/lookup_sites.yaml`; each entry is one line
-with a `top: true` flag for the default set, so adding or removing a site needs no code.
+Edit the lists any time: reverse-lookup sites live in `src/numint/data/lookup_sites.yaml`
+and dork searches in `src/numint/data/dorking.yaml`. Each entry is one line with a
+`top: true` flag for the small default set, so adding or removing one needs no code.
 
 ## Sending results to Discord
 
@@ -333,7 +337,8 @@ numint/
     engine.py      parse, ask providers at once, merge, find accounts, AI
     aggregator.py  merges answers and tracks conflicts and confidence
     footprint.py   builds the search links
-    lookup.py      builds the lookup-site links opened by --open
+    lookup.py      builds the reverse-lookup site links (--lookup)
+    dorking.py     builds the search-engine dork links (--dorking)
     report.py      terminal view, Markdown/JSON/PDF export, batch heatmap
   providers/       one file per data source
   presence/        one file per account check (based on ignorant)
