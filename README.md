@@ -24,8 +24,8 @@ You give it a phone number. Numint tells you everything public it can find:
 3. **One clean profile.** When providers disagree, Numint keeps every answer and shows
    who said what, instead of hiding it. It also shows how confident it is.
 4. **Finds accounts on the number.** It checks popular sites (Instagram, Amazon, Snapchat,
-   Twitter/X) to see if the number is registered there, and grabs any masked hint the site
-   leaks (like `j••@gm***.com`).
+   Twitter/X, Microsoft) to see if the number is registered there, and grabs any masked hint
+   the site leaks (like `j••@gm***.com`).
 5. **Search links.** Ready-to-click links to look the number up on Google, social sites,
    reverse-lookup sites, and messaging apps.
 6. **Optional AI summary.** Give it an OpenAI, Anthropic, or Gemini key and it writes a
@@ -173,6 +173,7 @@ Sites checked right now:
 | Amazon | registered or not |
 | Snapchat | registered or not |
 | Twitter / X | registered or not |
+| Microsoft | registered or not |
 
 Because you are contacting real sites, this is opt-in. In the terminal you must add
 `--yes-authorized` to confirm you are allowed to check the number. Sites change their
@@ -365,8 +366,8 @@ MIT. See [LICENSE](LICENSE).
 ## Please use this responsibly
 
 Numint only uses official APIs and public data. It does not scrape sites, break past
-paywalls or geoblocks, or touch leaked or breach data. The search-links section just
-builds links for you to open yourself.
+paywalls or geoblocks, or touch leaked or breach data. The lookup and dorking tools only
+build URLs and open them in your browser for manual review; they never scrape or log in.
 
 Only look up numbers you are allowed to look up, and follow the laws where you live and the
 terms of service of each provider. This tool is for learning about OSINT and for defensive

@@ -30,7 +30,7 @@ from .registry import discover
 
 log = get_logger("engine")
 
-_USER_AGENT = "numint/0.1 (+https://github.com/numint/numint)"
+_USER_AGENT = "numint/0.1 (+https://github.com/whoamitang/numint)"
 
 
 class Engine:

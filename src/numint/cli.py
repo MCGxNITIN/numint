@@ -66,6 +66,12 @@ class DefaultCommandGroup(TyperGroup):
     _GROUP_OPTIONS = {"--web", "--version", "--help", "-h"}
 
     def parse_args(self, ctx, args):
+        # Allow a bare `--web` (no port) to mean the default port.
+        if "--web" in args:
+            i = args.index("--web")
+            nxt = args[i + 1] if i + 1 < len(args) else None
+            if nxt is None or not nxt.isdigit():
+                args = [*args[: i + 1], "8080", *args[i + 1 :]]
         if args and args[0] not in self.commands and args[0] not in self._GROUP_OPTIONS:
             args = ["scan", *args]
         return super().parse_args(ctx, args)
@@ -253,7 +259,7 @@ def main(
     setup_logging()
 
     if web is not None:
-        _launch_web(host="0.0.0.0", port=web)
+        _launch_web(host="127.0.0.1", port=web)
         raise typer.Exit()
 
     if ctx.invoked_subcommand is None:
@@ -626,7 +632,11 @@ def discord_bot(
 @app.command()
 def web(
     port: int = typer.Option(8080, "--port", help="Port to serve on."),
-    host: str = typer.Option("0.0.0.0", "--host", help="Host/interface to bind."),
+    host: str = typer.Option(
+        "127.0.0.1", "--host",
+        help="Host/interface to bind. Default is localhost only; use "
+        "0.0.0.0 to expose it on your network.",
+    ),
 ) -> None:
     """Launch the web UI + API."""
     _launch_web(host=host, port=port)
